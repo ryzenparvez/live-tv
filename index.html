@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jashodal Internet – লাইভ টিভি</title>
+<meta name="description" content="Jashodal Internet BDIX লাইভ টিভি">
+<link rel="icon" href="assets/img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Hind+Siliguri:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main class="main">
+  <div class="hd"><a href="./"><img src="assets/img/logo.png" alt="Jashodal Internet"></a><span id="clk"></span><button class="btn" id="theme" type="button">থিম</button></div>
+  <div class="pwrap">
+    <div class="player" id="player"><video id="v" controls playsinline></video><div class="ov" id="ov" hidden></div><button class="x" id="x" type="button" aria-label="বন্ধ করুন">✕</button></div><div class="pcap" id="pcap"></div>
+  </div>
+  <div class="now">
+    <div><small id="nowCat">এখন চলছে</small><h1 id="nowName">লোড হচ্ছে…</h1></div>
+    <div class="acts"><button class="btn" id="fav" type="button">♥ প্রিয়</button><button class="btn" id="pip" type="button" hidden>PiP</button></div>
+  </div>
+  <div class="search-section"><h2 id="tvtitle"></h2><label class="sbox"><span class="mic">🎤</span><input id="q" type="search" placeholder="Search channels…" aria-label="চ্যানেল খুঁজুন"></label><span id="apps"></span></div>
+  <nav class="servers" id="servers" aria-label="সার্ভার"></nav>
+  <nav class="tabs" id="tabs" aria-label="ক্যাটাগরি"></nav>
+  <button class="btn" id="tvx" type="button">✕ টিভি মোড বন্ধ</button>
+  <div class="bar"><span id="count"></span></div>
+  <section class="grid" id="grid"></section>
+</main>
+<footer class="foot"><img src="assets/img/logo.png" alt="Jashodal Internet"><p>© 2026 Jashodal Internet. অনুমোদিত লাইভ স্ট্রিম।</p></footer>
+<button id="tvbtn" type="button">📺 টিভি মোড</button>
+<div id="tvinfo"></div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/channels.js"></script>
+<script src="assets/js/channels-s2.js"></script>
+<script src="assets/vendor/hls.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';document.head.appendChild(s)"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
