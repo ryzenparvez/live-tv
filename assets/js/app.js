@@ -20,7 +20,7 @@ function msg(h){ov.innerHTML=h;ov.hidden=false}
 function hide(){ov.hidden=true}
 function loading(){msg('<div class="spin"></div>')}
 function fail(t){failed=true;msg("<p>"+(t||"চ্যানেলটি এখন চালানো যাচ্ছে না। সার্ভার চালু আছে কিনা এবং আপনি BDIX নেটওয়ার্কে আছেন কিনা দেখুন।")+'</p><button type="button" data-retry>আবার চেষ্টা করুন</button>')}
-ov.addEventListener("click",function(e){if(e.target.closest("[data-retry]")&&cur)play(cur)});
+ov.addEventListener("click",function(e){if(e.target.closest("[data-retry]")&&cur)play(cur);if(e.target.closest("[data-open]")&&cur)openChannel(cur)});
 v.addEventListener("playing",hide);
 v.addEventListener("waiting",function(){if(!failed&&cur)loading()});
 
@@ -31,52 +31,52 @@ window.addEventListener("scroll",chk,{passive:true});v.addEventListener("play",c
 $("#x").onclick=function(){if(tvOn){tvPopSet(false);return}dis=true;v.pause();pl.classList.remove("sticky")};
 
 /* player */
-function url(c){if(c.srv&&c.srv.type==="iframe")return String(c.srv.playUrl||"").replace("{slug}",encodeURIComponent(c.slug));return c.url||String(S.streamPattern||"").replace("{slug}",c.slug)}
+var IS_APP=/JashodalTV/.test(navigator.userAgent);
+function url(c){if(c.srv&&c.srv.type==="iframe")return String((!IS_APP&&c.srv.webPlayUrl)||c.srv.playUrl||"").replace("{slug}",encodeURIComponent(c.slug));return c.url||String(S.streamPattern||"").replace("{slug}",c.slug)}
 function dropFrame(){var f=$("#fr");if(f)f.remove();pl.classList.remove("ifm")}
 function start(){var p=v.play();if(p&&p.then)p.then(hide).catch(function(){v.muted=true;var r=v.play();if(r&&r.catch)r.catch(hide)})}
 function play(c){
-  cur=c;failed=false;tries=0;dis=false;store.set("jsn_last",c.slug);
+  cur=c;c._alt=0;failed=false;tries=0;dis=false;store.set("jsn_last",c.slug);
   try{history.replaceState(null,"","#"+encodeURIComponent(c.slug))}catch(e){}
   $("#nowName").textContent=c.name;$("#nowCat").textContent=LABEL[c.cat]||c.cat;syncFav();mark();var pc=$("#pcap");if(pc)pc.innerHTML="<b>"+esc(c.name)+"</b><small>"+esc((c.srv?c.srv.name+" · ":"")+(LABEL[c.cat]||c.cat))+" · ▲ ▼ চ্যানেল বদল · OK ফুলস্ক্রিন · Back বন্ধ</small>";
   if(hls){hls.destroy();hls=null}
   v.removeAttribute("src");v.load();
   var u=url(c);dropFrame();
+  if(c.srv&&c.srv.mode==="open"){return msg("<p><b>"+esc(c.srv.name)+"</b> এর চ্যানেল তাদের নিজস্ব প্লেয়ার পেজে খোলে।</p><button type=\"button\" data-open>▶ "+esc(c.name)+" চালান</button>")}
   if(c.srv&&c.srv.type==="iframe"){
     if(!u)return msg("<p><b>সার্ভারের playUrl সেট করা হয়নি।</b><br>assets/js/config.js এ দিন।</p>");
     if(location.protocol==="https:"&&/^http:/i.test(u))return fail("সাইট HTTPS-এ চলছে কিন্তু এই সার্ভার HTTP। ব্রাউজার ব্লক করে। সাইটও HTTP-তে চালান।");
     loading();
     if(c.srv.resolve!==false&&window.fetch){
-      resolveEmbed(c,u).then(function(eu){
+      fetch(u).then(function(r){return r.text()}).then(function(t){
         if(cur!==c)return;
-        if(!eu){fail("SERVER-1 এর টোকেন আনা যায়নি। সাইটের ফোল্ডারে resolve.php আছে কিনা এবং /resolve.php?stream="+encodeURIComponent(c.slug)+"&debug=1 খুললে কী আসে দেখুন।");return}
-        /* টোকেনসহ index.m3u8 দিয়ে নিজের প্লেয়ারে চেষ্টা; না হলে টোকেনসহ embed পেজ iframe এ (যেটা আলাদা Tab এ চলে) */
-        hlsStart(eu.replace("embed.html","index.m3u8"),function(){if(cur!==c)return;if(hls){hls.destroy();hls=null}v.removeAttribute("src");v.load();frame(c,eu)},true);
-      });
+        var m=/(https?:\/\/[^"'\s<>\\]+?\/embed\.html\?[^"'\s<>\\]*)/i.exec(t.replace(/\\\//g,"/"));
+        if(!m){frame(c,u);return}
+        var emb=m[1].replace(/&amp;/g,"&");       // চ্যানেলের নিজস্ব প্লেয়ার পেজ (ইতিমধ্যে টোকেনসহ), সরাসরি এটাই iframe-এ বসালে ব্রাউজারেও চলে
+        var hu=emb.replace("embed.html","index.m3u8");
+        if(!IS_APP&&c.srv.webStream){var ws=c.srv.webStream;if(typeof ws[0]==="string")ws=[ws];ws.forEach(function(p){hu=hu.replace(p[0],p[1])})}
+        var reset=function(){if(hls){hls.destroy();hls=null}v.removeAttribute("src");v.load()};
+        hlsStart(hu,function(){
+          if(cur!==c)return;reset();
+          var alt=hu.replace("index.m3u8","mono.m3u8");
+          if(alt!==hu&&!c._alt){c._alt=1;tries=0;hlsStart(alt,function(){if(cur!==c)return;reset();frame(c,emb)});return}
+          frame(c,emb)});
+      }).catch(function(){frame(c,u)});
     }else frame(c,u);
     return}
   if(!c.url&&/YOUR-SERVER|^$/.test(u)){return msg("<p><b>স্ট্রিম সার্ভার সেট করা হয়নি।</b><br>assets/js/config.js ফাইলে streamPattern এ আপনার সার্ভারের ঠিকানা দিন।</p>")}
   if(location.protocol==="https:"&&/^http:/i.test(u)){return fail("সাইট HTTPS-এ চলছে কিন্তু স্ট্রিম HTTP। ব্রাউজার এটি ব্লক করে। সাইট ও স্ট্রিম একই ধরনের (দুটোই HTTP বা দুটোই HTTPS) রাখুন।")}
   loading();hlsStart(u);
 }
-/* SERVER-1: play.php থেকে টোকেনসহ embed লিংক বের করা। ১) সরাসরি fetch (অ্যাপ/WebView এ চলে) ২) resolve.php প্রক্সি (সাধারণ ব্রাউজারে CORS এর কারণে সরাসরি হয় না) */
-function ft(u,ms){var o={cache:"no-store"};return Promise.race([fetch(u,o),new Promise(function(_,rj){setTimeout(function(){rj(new Error("timeout"))},ms||9000)})])}
-function absUrl(h,b){try{return new URL(h,b).href}catch(e){return h}}
-function embedOf(t,base){var m=/["']([^"'\s<>]*embed\.html[^"'\s<>]*)["']/i.exec(t);if(!m)return"";return absUrl(m[1].replace(/&amp;/g,"&").replace(/\\\//g,"/"),base)}
-function resolveEmbed(c,u){
-  var s=c.srv;
-  var direct=function(){return ft(u).then(function(r){return r.text()}).then(function(t){var e=embedOf(t,u);if(!e)throw 0;return e})};
-  var viaProxy=function(){if(!s.resolveUrl)return Promise.reject();var p=String(s.resolveUrl).replace("{slug}",encodeURIComponent(c.slug));return ft(p,12000).then(function(r){return r.json()}).then(function(j){if(!j||!j.embed)throw 0;return j.embed})};
-  return direct().catch(viaProxy).catch(function(){return null})
-}
-function frame(c,u){if(cur!==c)return;dropFrame();pl.classList.add("ifm");var fr=document.createElement("iframe");fr.id="fr";fr.setAttribute("allow","autoplay; fullscreen; encrypted-media");fr.setAttribute("allowfullscreen","");fr.tabIndex=-1;fr.setAttribute("referrerpolicy","no-referrer");fr.onload=function(){hide()};fr.src=u;pl.insertBefore(fr,ov)}
-function hlsStart(u,onFail,quick){
-  var bad=onFail||function(t){fail(t)},up=false;
+function openChannel(c){store.set("jsn_last",c.slug);var u=url(c);if(!u)return;if(IS_APP&&window.JashodalApp&&JashodalApp.openPlayer){JashodalApp.openPlayer(u);return}if(IS_APP)location.href=u;else window.open(u,"_blank")}
+function frame(c,u){if(cur!==c)return;dropFrame();pl.classList.add("ifm");var fr=document.createElement("iframe");fr.id="fr";fr.setAttribute("allow","autoplay; fullscreen; encrypted-media");fr.setAttribute("allowfullscreen","");fr.tabIndex=-1;fr.onload=function(){hide()};fr.src=u;pl.insertBefore(fr,ov)}
+function hlsStart(u,onFail){
+  var bad=onFail||function(t){fail(t)};
   if(window.Hls&&Hls.isSupported()){
-    hls=new Hls(quick?{maxBufferLength:30,liveSyncDurationCount:3,manifestLoadingMaxRetry:0,levelLoadingMaxRetry:0,manifestLoadingTimeOut:7000}:{maxBufferLength:30,liveSyncDurationCount:3});
-    hls.on(Hls.Events.MANIFEST_PARSED,function(){up=true;start()});
+    hls=new Hls({maxBufferLength:30,liveSyncDurationCount:3});
+    hls.on(Hls.Events.MANIFEST_PARSED,start);
     hls.on(Hls.Events.ERROR,function(e,d){
       if(!d.fatal)return;
-      if(quick&&!up){bad();return}
       if(d.type===Hls.ErrorTypes.NETWORK_ERROR&&tries++<3){setTimeout(function(){if(hls)hls.startLoad()},1500)}
       else if(d.type===Hls.ErrorTypes.MEDIA_ERROR&&tries++<3){hls.recoverMediaError()}
       else bad();
@@ -106,7 +106,7 @@ function grid(){
   $("#grid").innerHTML=r.length?r.map(function(c){return'<div class="ch'+(cur&&cur.slug===c.slug?" on":"")+'" role="button" tabindex="0" data-s="'+esc(c.slug)+'"><button class="heart'+(favs.indexOf(c.slug)>-1?" y":"")+'" type="button" aria-label="প্রিয় তালিকা" data-f="'+esc(c.slug)+'">♥</button><div class="lg">'+(c.logo?'<img src="'+esc(c.logo)+'" alt="'+esc(ini(c.name))+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=this.alt">':esc(ini(c.name)))+"</div><span>"+esc(c.name)+"</span></div>"}).join(""):'<p class="empty">'+(cat==="fav"?"প্রিয় তালিকা খালি। কার্ডের ♥ চাপুন।":"কোনো চ্যানেল পাওয়া যায়নি।")+"</p>";
 }
 function mark(){[].forEach.call(document.querySelectorAll(".ch"),function(e){e.classList.toggle("on",!!cur&&e.getAttribute("data-s")===cur.slug)})}
-function pick(el){var s=el.getAttribute("data-s"),c=list.filter(function(x){return x.slug===s})[0];if(c){if(tvOn){play(c);tvPopSet(true)}else{play(c);$(".pwrap").scrollIntoView({behavior:"smooth",block:"start"})}}}
+function pick(el){var s=el.getAttribute("data-s"),c=list.filter(function(x){return x.slug===s})[0];if(c&&c.srv&&c.srv.mode==="open"){openChannel(c);return}if(c){if(tvOn){play(c);tvPopSet(true)}else{play(c);$(".pwrap").scrollIntoView({behavior:"smooth",block:"start"})}}}
 $("#grid").addEventListener("click",function(e){var f=e.target.closest("[data-f]");if(f){toggleFav(f.getAttribute("data-f"));return}var c=e.target.closest(".ch");if(c)pick(c)});
 $("#grid").addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("ch")){e.preventDefault();pick(e.target)}});
 $("#tabs").addEventListener("click",function(e){var b=e.target.closest(".tab");if(b){cat=b.getAttribute("data-k");tabs();grid()}});

@@ -1,0 +1,25 @@
+BDIX SERVER-1 কে ওয়েবসাইটে (ব্রাউজারে) চালানোর জন্য proxy
+=========================================================
+অ্যাপে এটা লাগে না। শুধু ব্রাউজারে দেখতে চাইলে লাগে, কারণ ব্রাউজার অন্য ডোমেইনের পেজ সরাসরি পড়তে দেয় না, তাই নিজের সার্ভার দিয়ে ঘুরিয়ে আনতে হয়।
+
+Caddyfile (Windows/Linux) এ আপনার সাইটের ব্লকের ভেতরে:
+  handle_path /s1/* {
+    reverse_proxy http://tv.bdiptv.net {
+      header_up Host {upstream_hostport}
+    }
+  }
+  # স্ট্রিম সার্ভার একাধিক (চ্যানেলভেদে .14, .22, .30 ...), প্রত্যেকটার জন্য একটা করে:
+  handle_path /s1stream14/* { reverse_proxy http://103.89.248.14:8082 { header_up Host {upstream_hostport} } }
+  handle_path /s1stream22/* { reverse_proxy http://103.89.248.22:8082 { header_up Host {upstream_hostport} } }
+  handle_path /s1stream30/* { reverse_proxy http://103.89.248.30:8082 { header_up Host {upstream_hostport} } }
+
+nginx এ:
+  location /s1/ { proxy_pass http://tv.bdiptv.net/; proxy_set_header Host tv.bdiptv.net; }
+  location /s1stream14/ { proxy_pass http://103.89.248.14:8082/; }
+  location /s1stream22/ { proxy_pass http://103.89.248.22:8082/; }
+  location /s1stream30/ { proxy_pass http://103.89.248.30:8082/; }
+
+তারপর assets/js/config.js এ SERVER-1 এর লাইনে webPlayUrl ও webStream এর // তুলে দিন, সার্ভার রিস্টার্ট করুন।
+প্রথমে diag.html খুলে ডায়াগনস্টিক চালিয়ে দেখুন কোন ধাপ আটকাচ্ছে।
+
+এই তালিকায় নেই এমন নতুন সার্ভার IP এলে একইভাবে আরেকটা লাইন ও config.js এর webStream এ আরেকটা জোড়া যোগ করুন।

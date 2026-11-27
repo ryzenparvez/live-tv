@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="bn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SERVER-1 ডায়াগনস্টিক</title>
+<style>body{margin:0;padding:16px;background:#06231D;color:#EAF7E0;font:15px/1.5 system-ui,'Hind Siliguri',sans-serif}h1{font-size:20px;margin:0 0 10px}select,button{height:40px;border-radius:8px;border:0;padding:0 14px;font:inherit}button{background:#E3EF26;color:#06231D;font-weight:600;margin:4px 4px 4px 0}pre{white-space:pre-wrap;word-break:break-all;background:#04120D;padding:12px;border-radius:8px;min-height:120px}a{color:#E3EF26}</style></head><body>
+<h1>SERVER-1 ডায়াগনস্টিক</h1>
+<p>চ্যানেল বেছে "টেস্ট চালান" চাপুন। যা আসে সেটা "রেজাল্ট কপি" করে আমাকে পাঠান। <b>এটা অ্যাপের ভেতরে চালান</b> (সাধারণ ব্রাউজারে CORS-এর কারণে ধাপগুলো ❌ আসবে, সেটা স্বাভাবিক)।</p>
+<select id="ch"></select> <button id="run">টেস্ট চালান</button><button id="cp">রেজাল্ট কপি</button> <a href="./">← সাইটে ফিরুন</a>
+<pre id="out"></pre>
+<h2 style="font-size:17px;margin-top:22px">সরাসরি লিংক টেস্ট</h2>
+<p>ব্রাউজারে যে লিংক চলে সেটা এখানে বসান (embed.html বা index.m3u8)। টোকেনের মেয়াদ প্রায় ৩ ঘণ্টা, তাই টাটকা লিংক দিন।</p>
+<input id="lk" style="width:100%;height:40px;border-radius:8px;border:0;padding:0 10px;box-sizing:border-box" value="http://103.89.248.14:8082/STAR-SPORTS-1/embed.html?token=093d169734c5fb5ed2242188f234c14b9e61fe94-30339f4f66123f9374a4629f5302cff8-1795671984-1795661184&amp;remote=no_check_ip">
+<button id="lkA">বিশ্লেষণ</button><button id="lkB">iframe-এ চালান</button><button id="lkC">HLS প্লেয়ারে চালান</button>
+<pre id="lo"></pre>
+<div id="box" style="max-width:640px;aspect-ratio:16/9;background:#000;margin-top:8px"></div>
+<script src="assets/js/config.js"></script><script src="assets/js/channels-s1.js"></script>
+<script>
+var out=document.getElementById("out"),sel=document.getElementById("ch"),S1=((window.SITE||{}).servers||[]).filter(function(s){return s.id==="s1"})[0]||{},isApp=/JashodalTV/.test(navigator.userAgent);
+(window.CH_S1||[]).forEach(function(r,i){var o=document.createElement("option");o.value=r[2];o.textContent=r[0];if(i===0)o.selected=true;sel.appendChild(o)});
+function log(s){out.textContent+=s+"\n"}
+function sig(ms){var c=new AbortController();setTimeout(function(){c.abort()},ms);return c.signal}
+async function step(label,fn){try{var r=await fn();log("✅ "+label);return r||true}catch(e){log("❌ "+label+" → "+(e&&e.message||e));return null}}
+document.getElementById("cp").onclick=function(){try{navigator.clipboard.writeText(out.textContent)}catch(e){var r=document.createRange();r.selectNode(out);getSelection().addRange(r);document.execCommand("copy")}};
+document.getElementById("run").onclick=async function(){
+  out.textContent="";var slug=sel.value;
+  log("অ্যাপ: "+(isApp?"হ্যাঁ":"না (ব্রাউজার)")+" | "+location.protocol+" | "+navigator.userAgent.slice(0,90));
+  var u=String((!isApp&&S1.webPlayUrl)||S1.playUrl||"").replace("{slug}",encodeURIComponent(slug));
+  log("play পেজ: "+u);
+  var html="";
+  var ok1=await step("১. play পেজ পড়া",async function(){var r=await fetch(u,{signal:sig(10000)});html=await r.text();log("   status "+r.status+", "+html.length+" অক্ষর");log("   শুরু: "+html.replace(/\s+/g," ").slice(0,200));return true});
+  if(!ok1)return log("\nপ্লেয়ার পেজই পড়া যায়নি: সার্ভার/নেটওয়ার্ক/CORS সমস্যা (BDIX-এ আছেন কি?)");
+  var m=/(https?:\/\/[^"'\s<>\\]+?\/embed\.html\?[^"'\s<>\\]*)/i.exec(html.replace(/\\\//g,"/"));
+  if(!m)return log("❌ ২. পেজে embed.html লিংক পাওয়া যায়নি, পেজের গঠন বদলেছে");
+  var emb=m[1].replace(/&amp;/g,"&");log("✅ ২. embed লিংক → "+emb);
+  var hu=emb.replace("embed.html","index.m3u8");if(!isApp&&S1.webStream)hu=hu.replace(S1.webStream[0],S1.webStream[1]);
+  log("HLS লিংক: "+hu);
+  var ok3=await step("৩. HLS প্লেলিস্ট পড়া",async function(){var r=await fetch(hu,{signal:sig(10000)});var t=await r.text();log("   status "+r.status+", type "+r.headers.get("content-type"));log("   শুরু: "+t.replace(/\s+/g," ").slice(0,200));if(!r.ok)throw new Error("status "+r.status);return true});
+  if(!ok3){var alt=hu.replace("index.m3u8","mono.m3u8");await step("৩ক. mono.m3u8 চেষ্টা",async function(){var r=await fetch(alt,{signal:sig(10000)});var t=await r.text();log("   status "+r.status+" "+t.replace(/\s+/g," ").slice(0,100));if(!r.ok)throw new Error("status "+r.status);return true})}
+  log("\nশেষ। এই পুরো লেখা কপি করে পাঠান।");
+};
+
+var lo=document.getElementById("lo"),box=document.getElementById("box");
+function ll(s){lo.textContent+=s+"\n"}
+function parseLink(){var u=document.getElementById("lk").value.trim().replace(/&amp;/g,"&");var m=/^(https?:\/\/[^\/]+)\/([^\/?]+)\/(embed\.html|index\.m3u8|mono\.m3u8)\?(.*)$/.exec(u);return m?{host:m[1],stream:m[2],q:m[4],u:u}:null}
+function hlsUrl(p){return p.host+"/"+p.stream+"/index.m3u8?"+p.q}
+document.getElementById("lkA").onclick=function(){lo.textContent="";var p=parseLink();if(!p)return ll("❌ লিংকের ধরন চেনা যায়নি");
+  ll("সার্ভার: "+p.host);ll("চ্যানেল: "+p.stream);
+  var t=/token=[^&-]*-[^&-]*-(\d+)-(\d+)/.exec(p.q);
+  if(t){var e=+t[1]*1000,s=+t[2]*1000,now=Date.now();ll("টোকেন শুরু: "+new Date(s).toLocaleString()+" | শেষ: "+new Date(e).toLocaleString());ll(now>e?"❌ টোকেনের মেয়াদ শেষ":"✅ মেয়াদ আছে, বাকি প্রায় "+Math.round((e-now)/60000)+" মিনিট")}
+  ll("HLS লিংক: "+hlsUrl(p))};
+document.getElementById("lkB").onclick=function(){var p=parseLink();if(!p)return;box.innerHTML="";var f=document.createElement("iframe");f.src=p.u;f.style.cssText="width:100%;height:100%;border:0";f.allow="autoplay; fullscreen";box.appendChild(f);ll("iframe লোড হচ্ছে... ফাঁকা থাকলে সার্ভার iframe ব্লক করছে বা লিংক চলছে না")};
+document.getElementById("lkC").onclick=function(){var p=parseLink();if(!p)return;box.innerHTML='<video controls autoplay muted playsinline style="width:100%;height:100%"></video>';var v=box.firstChild,u=hlsUrl(p);
+  function go(){if(window.Hls&&Hls.isSupported()){var h=new Hls();h.on(Hls.Events.ERROR,function(e,x){ll("HLS error: "+x.type+" / "+x.details+(x.response?" / status "+x.response.code:"")+(x.fatal?" (fatal)":""))});h.on(Hls.Events.MANIFEST_PARSED,function(){ll("✅ প্লেলিস্ট পাওয়া গেছে, চালু হচ্ছে");v.play().catch(function(){})});h.loadSource(u);h.attachMedia(v)}else if(v.canPlayType("application/vnd.apple.mpegurl")){v.src=u;ll("native HLS দিয়ে চেষ্টা")}else ll("❌ hls.js নেই")}
+  if(window.Hls)return go();
+  var s=document.createElement("script");s.src="assets/vendor/hls.min.js";s.onload=go;
+  s.onerror=function(){var s2=document.createElement("script");s2.src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";s2.onload=go;s2.onerror=function(){ll("❌ hls.js লোড হয়নি")};document.head.appendChild(s2)};
+  document.head.appendChild(s)};
+</script></body></html>
